@@ -3,10 +3,14 @@ package com.arquivos.api.service;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,24 +20,26 @@ import com.arquivos.api.repository.ArquivoRepository;
 @Service
 public class ArquivoService {
 
-    public Arquivo uploadArquivo(MultipartFile file, String nome) throws IllegalStateException, IOException{
-        String path = /* Criar pasta e usar o camminho */"/arquivos/" + file.getOriginalFilename();
+    public Arquivo uploadArquivo(MultipartFile file) throws IOException{
+        String filePath = ROOT_PATH + file.getOriginalFilename();
+
+        Path path = Paths.get(filePath);
+        
+        Files.createDirectory(path.getParent());
+
+        Files.write(path,file.getBytes());
 
         Arquivo arquivo = new Arquivo();
 
-        arquivo.setNome(nome);
+        arquivo.setNome(file.getOriginalFilename());
         arquivo.setDataHoraEnvio(LocalDateTime.now());
-        arquivo.setPath(path);
+        arquivo.setPath(filePath);
         arquivo.setTipo(file.getContentType());
-
-        File novoFile = new File(path);
-
-        file.transferTo(novoFile);
 
         return arquivoRepository.save(arquivo);
     }
 
-    public byte[] downloadArquivo(String nome) throws IOException{
+    public ByteArrayResource downloadArquivo(String nome) throws IOException{
         Optional<Arquivo> arquivo = arquivoRepository.findByNome(nome);    
         
         if (arquivo.isPresent()) {
@@ -41,12 +47,20 @@ public class ArquivoService {
             
             File file = new File(path);
 
-            return Files.readAllBytes(file.toPath());
+            return new ByteArrayResource(Files.readAllBytes(file.toPath()));
         }
         
         return null;
 
     }
+
+    public boolean arquivoExiste(String nome){
+        Optional<Arquivo> arquivo = arquivoRepository.findByNome(nome);
+
+        return arquivo.isPresent();
+    }
+
+    public static final String ROOT_PATH = "../arquivos";
 
     @Autowired
     private ArquivoRepository arquivoRepository;
